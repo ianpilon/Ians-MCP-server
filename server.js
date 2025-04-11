@@ -2,55 +2,50 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
-const { EventEmitter } = require('events');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
-const port = 3000;
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }
+});
 
-// Enable CORS with specific options
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors());
 app.use(express.json());
 
 // MCP endpoint configuration
 let mcpConfig = {
   "version": "1.0",
-  "capabilities": ["file_read", "sse"],
+  "capabilities": ["file_read", "websocket"],
   "files": []
 };
 
-// Create event emitter for SSE
-const eventEmitter = new EventEmitter();
-
-// SSE endpoint
-app.get('/events', (req, res) => {
-  // Set SSE headers
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': '*'
-  });
-
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected');
+  
   // Send initial connection message
-  res.write('event: connected\ndata: Connected to MCP SSE stream\n\n');
+  socket.emit('connected', 'Connected to MCP WebSocket stream');
 
   // Setup heartbeat interval (every 30 seconds)
   const heartbeat = setInterval(() => {
-    res.write(`event: heartbeat\ndata: ${new Date().toISOString()}\n\n`);
+    socket.emit('heartbeat', new Date().toISOString());
   }, 30000);
 
   // Handle client disconnect
-  req.on('close', () => {
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
     clearInterval(heartbeat);
   });
 
   // Error handling
-  req.on('error', (err) => {
-    console.error('SSE Error:', err);
+  socket.on('error', (err) => {
+    console.error('WebSocket Error:', err);
     clearInterval(heartbeat);
   });
 });
@@ -110,9 +105,8 @@ app.get('/file/:filename', async (req, res) => {
   }
 });
 
-// Initialize files list before starting server
-initializeFilesList().then(() => {
-  app.listen(port, () => {
-    console.log(`MCP Server running at http://localhost:${port}`);
-  });
-});
+// Initialize files list
+await initializeFilesList();
+
+// Export for Vercel
+module.exports = httpServer;
