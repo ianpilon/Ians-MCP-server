@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const { EventEmitter } = require('events');
 
 const app = express();
 const port = 3000;
@@ -17,9 +18,42 @@ app.use(express.json());
 // MCP endpoint configuration
 let mcpConfig = {
   "version": "1.0",
-  "capabilities": ["file_read"],
+  "capabilities": ["file_read", "sse"],
   "files": []
 };
+
+// Create event emitter for SSE
+const eventEmitter = new EventEmitter();
+
+// SSE endpoint
+app.get('/events', (req, res) => {
+  // Set SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+
+  // Send initial connection message
+  res.write('event: connected\ndata: Connected to MCP SSE stream\n\n');
+
+  // Setup heartbeat interval (every 30 seconds)
+  const heartbeat = setInterval(() => {
+    res.write(`event: heartbeat\ndata: ${new Date().toISOString()}\n\n`);
+  }, 30000);
+
+  // Handle client disconnect
+  req.on('close', () => {
+    clearInterval(heartbeat);
+  });
+
+  // Error handling
+  req.on('error', (err) => {
+    console.error('SSE Error:', err);
+    clearInterval(heartbeat);
+  });
+});
 
 // Initialize files list from data directory
 async function initializeFilesList() {
