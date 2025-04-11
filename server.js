@@ -16,6 +16,8 @@ app.use(express.json());
 
 // MCP endpoint configuration
 let mcpConfig = {
+  "version": "1.0",
+  "capabilities": ["file_read"],
   "files": []
 };
 
@@ -32,12 +34,30 @@ async function initializeFilesList() {
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({ message: 'MCP Server Running', availableFiles: mcpConfig.files });
+  res.json(mcpConfig);
 });
 
 // MCP configuration endpoint
+// MCP configuration endpoint
 app.get('/mcp-config', (req, res) => {
   res.json(mcpConfig);
+});
+
+// MCP handshake endpoint
+app.post('/mcp/handshake', (req, res) => {
+  res.json({
+    status: "ok",
+    version: mcpConfig.version,
+    capabilities: mcpConfig.capabilities
+  });
+});
+
+// MCP status endpoint
+app.get('/mcp/status', (req, res) => {
+  res.json({
+    status: "ok",
+    files: mcpConfig.files
+  });
 });
 
 // Get content of a specific RTF file
