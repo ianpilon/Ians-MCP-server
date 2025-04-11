@@ -105,8 +105,10 @@ app.get('/file/:filename', async (req, res) => {
   }
 });
 
-// Initialize files list
-await initializeFilesList();
+// Initialize files list and start server
+initializeFilesList().then(() => {
+  console.log('Files list initialized');
+});
 
 // Export for Vercel
 module.exports = httpServer;
